@@ -10,7 +10,7 @@
 
     "action": {
         "default_popup": "popup.html",
-        "default_timer": "Focus Timer"
+        "default_title": "Focus Timer"
         
     },
     

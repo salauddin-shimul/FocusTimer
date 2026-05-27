@@ -11,6 +11,26 @@ document.addEventListener('DOMContentLoaded', () => {
 	let currentMode = 'work';
 	let isRunning = false;
 	let intervalId = null;
+	let workTabs = [];
+	let playTabs = [];
+
+	function hasChromeTabsApi() {
+		return Boolean(globalThis.chrome?.tabs?.query);
+	}
+
+	function normalizeTabEntry(tab) {
+		if (typeof tab === 'string') {
+			return {
+				title: tab,
+				url: tab,
+			};
+		}
+
+		return {
+			title: tab?.title || tab?.url || 'Untitled tab',
+			url: tab?.url || '',
+		};
+	}
 
 	function formatTime(totalSeconds) {
 		const minutes = Math.floor(totalSeconds / 60);
@@ -40,6 +60,54 @@ document.addEventListener('DOMContentLoaded', () => {
 		toggleButton.textContent = currentMode === 'work' ? 'Start Work' : 'Start Play';
 	}
 
+	function renderTabList(listElement, tabs, mode) {
+		listElement.textContent = '';
+
+		if (tabs.length === 0) {
+			return;
+		}
+
+		tabs.forEach((tabLabel) => {
+			const item = document.createElement('li');
+
+			item.textContent = tabLabel.title;
+			item.className = `tab-item tab-item--${mode}`;
+			listElement.appendChild(item);
+		});
+	}
+
+	function updateTabLists() {
+		renderTabList(workTabList, workTabs, 'work');
+		renderTabList(playTabList, playTabs, 'play');
+	}
+
+	function saveState() {
+		if (!globalThis.chrome?.storage?.local) {
+			return;
+		}
+
+		chrome.storage.local.set({
+			mode: currentMode,
+			remainingSeconds,
+			isRunning,
+			workTabs,
+			playTabs,
+		});
+	}
+
+	function applyState(state) {
+		currentMode = state.mode === 'play' ? 'play' : 'work';
+		remainingSeconds = Number.isFinite(state.remainingSeconds) ? state.remainingSeconds : defaultSeconds;
+		isRunning = Boolean(state.isRunning);
+		workTabs = Array.isArray(state.workTabs) ? state.workTabs.map(normalizeTabEntry) : [];
+		playTabs = Array.isArray(state.playTabs) ? state.playTabs.map(normalizeTabEntry) : [];
+
+		updateTimerDisplay();
+		updateModeIndicator();
+		updateToggleButton();
+		updateTabLists();
+	}
+
 	function stopTimer() {
 		if (intervalId !== null) {
 			clearInterval(intervalId);
@@ -48,6 +116,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 		isRunning = false;
 		updateToggleButton();
+		saveState();
 	}
 
 	function startTimer() {
@@ -57,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 		isRunning = true;
 		updateToggleButton();
+		saveState();
 
 		intervalId = setInterval(() => {
 			if (remainingSeconds <= 0) {
@@ -72,6 +142,8 @@ document.addEventListener('DOMContentLoaded', () => {
 				updateTimerDisplay();
 				stopTimer();
 			}
+
+			saveState();
 		}, 1000);
 	}
 
@@ -84,18 +156,43 @@ document.addEventListener('DOMContentLoaded', () => {
 		} else {
 			startTimer();
 		}
+
+		saveState();
 	}
 
 	function handleAddTab(event) {
 		const mode = event.currentTarget.dataset.mode;
-		const list = mode === 'work' ? workTabList : playTabList;
-		const item = document.createElement('li');
+		const pushTab = (tab) => {
+			const normalizedTab = normalizeTabEntry(tab);
 
-		item.textContent = `${mode === 'work' ? 'Work' : 'Play'} tab placeholder`;
-		item.style.padding = '8px 12px';
-		item.style.borderBottom = '1px solid #e5e7eb';
+			if (mode === 'work') {
+				workTabs = [...workTabs, normalizedTab];
+			} else {
+				playTabs = [...playTabs, normalizedTab];
+			}
 
-		list.appendChild(item);
+			updateTabLists();
+			saveState();
+		};
+
+		if (hasChromeTabsApi()) {
+			chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+				const [activeTab] = tabs;
+
+				if (!activeTab || !activeTab.url) {
+					pushTab({ title: `${mode === 'work' ? 'Work' : 'Play'} tab`, url: '' });
+					return;
+				}
+
+				pushTab(activeTab);
+			});
+			return;
+		}
+
+		pushTab({
+			title: `${mode === 'work' ? 'Work' : 'Play'} tab placeholder`,
+			url: '',
+		});
 	}
 
 	toggleButton.addEventListener('click', handleToggleClick);
@@ -104,7 +201,43 @@ document.addEventListener('DOMContentLoaded', () => {
 		button.addEventListener('click', handleAddTab);
 	});
 
-	updateTimerDisplay();
-	updateModeIndicator();
-	updateToggleButton();
+	if (globalThis.chrome?.storage?.local) {
+		chrome.storage.local.get(
+			{
+				mode: 'work',
+				remainingSeconds: defaultSeconds,
+				isRunning: false,
+				workTabs: [],
+				playTabs: [],
+			},
+			(state) => applyState(state),
+		);
+
+		chrome.storage.onChanged.addListener((changes, areaName) => {
+			if (areaName !== 'local') {
+				return;
+			}
+
+			const nextState = {
+				mode: currentMode,
+				remainingSeconds,
+				isRunning,
+				workTabs,
+				playTabs,
+			};
+
+			Object.keys(changes).forEach((key) => {
+				if (Object.prototype.hasOwnProperty.call(nextState, key)) {
+					nextState[key] = changes[key].newValue;
+				}
+			});
+
+			applyState(nextState);
+		});
+	} else {
+		updateTimerDisplay();
+		updateModeIndicator();
+		updateToggleButton();
+		updateTabLists();
+	}
 });

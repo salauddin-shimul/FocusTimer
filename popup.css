@@ -29,8 +29,10 @@ body {
 body {
 	width: 300px;
 	min-width: 300px;
+	max-height: 600px;
+	overflow-y: auto;
 	box-sizing: border-box;
-	padding: 16px;
+	padding: 14px;
 	background: linear-gradient(180deg, var(--color-bg) 0%, var(--color-bg-alt) 100%);
 	color: var(--color-text);
 	font-family: "Trebuchet MS", "Lucida Sans Unicode", "Lucida Grande", sans-serif;
@@ -39,7 +41,7 @@ body {
 .popup {
 	display: flex;
 	flex-direction: column;
-	gap: 14px;
+	gap: 12px;
 }
 
 .popup__header {

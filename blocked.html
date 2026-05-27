@@ -163,21 +163,20 @@
       }
 
       function updateStatus(state) {
-        modeBadge.textContent = 'Blocked during Work Mode';
-        modeHeading.textContent = 'You\'re in Work Mode.';
-        modeMessage.textContent = 'This tab is in your Play group, so it stays paused while your work session is active.';
+        const activeMode = state.mode === 'play' ? 'Play Mode' : 'Work Mode';
+        const blockedGroup = state.mode === 'play' ? 'Work' : 'Play';
 
-        if (state.mode !== 'work') {
-          blockedStatusElement.textContent = 'Play Mode is active. You can return to this tab.';
-          return;
-        }
+        modeBadge.textContent = `Blocked during ${activeMode}`;
+        modeHeading.textContent = `You\'re in ${activeMode}.`;
+        modeMessage.textContent = `This tab is in your ${blockedGroup} group, so it stays paused while your ${activeMode.toLowerCase()} session is active.`;
 
         if (!state.timerRunning) {
-          blockedStatusElement.textContent = 'Timer is paused. Start Work from the popup to resume.';
+          blockedStatusElement.textContent = `Timer is paused. Start ${activeMode} from the popup to resume.`;
           return;
         }
 
-        blockedStatusElement.textContent = `Play Mode starts in ${formatTime(state.timerSeconds)}.`;
+        const nextMode = state.mode === 'work' ? 'Play Mode' : 'Work Mode';
+        blockedStatusElement.textContent = `${nextMode} starts in ${formatTime(state.timerSeconds)}.`;
       }
 
       if (blockedTitle) {

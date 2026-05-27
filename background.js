@@ -52,8 +52,8 @@ function normalizeState(items) {
 	};
 }
 
-function isPlayTab(url, playTabs) {
-	return playTabs.some((tab) => {
+function isTabInList(url, tabs) {
+	return tabs.some((tab) => {
 		const normalizedTab = normalizeTabEntry(tab);
 		return normalizedTab.url === url;
 	});
@@ -202,12 +202,10 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 		return;
 	}
 
-	chrome.storage.local.get({ mode: 'work', playTabs: [] }, (items) => {
-		if (items.mode !== 'work') {
-			return;
-		}
-
-		if (!isPlayTab(targetUrl, items.playTabs)) {
+	chrome.storage.local.get({ mode: 'work', playTabs: [], workTabs: [] }, (items) => {
+		const mode = items.mode === 'play' ? 'play' : 'work';
+		const blockedTabs = mode === 'work' ? items.playTabs : items.workTabs;
+		if (!isTabInList(targetUrl, blockedTabs)) {
 			return;
 		}
 

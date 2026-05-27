@@ -272,7 +272,6 @@ body {
 	font-size: 12px;
 	line-height: 1.3;
 	color: var(--color-text);
-	word-break: break-word;
 	gap: 8px;
 }
 
@@ -290,6 +289,10 @@ body {
 
 .tab-item__title {
 	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .tab-remove-button {

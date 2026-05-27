@@ -52,10 +52,48 @@ function normalizeState(items) {
 	};
 }
 
+function normalizeHostname(url) {
+	try {
+		const parsed = new URL(url);
+		return parsed.hostname.replace(/^www\./i, '').toLowerCase();
+	} catch {
+		return null;
+	}
+}
+
+function baseDomain(hostname) {
+	if (!hostname) {
+		return null;
+	}
+
+	if (hostname === 'localhost' || /^[0-9.]+$/.test(hostname) || hostname.includes(':')) {
+		return hostname;
+	}
+
+	const parts = hostname.split('.').filter(Boolean);
+	if (parts.length <= 2) {
+		return hostname;
+	}
+
+	return parts.slice(-2).join('.');
+}
+
 function isTabInList(url, tabs) {
+	const targetHost = normalizeHostname(url);
+	const targetBase = baseDomain(targetHost);
+	if (!targetBase) {
+		return false;
+	}
+
 	return tabs.some((tab) => {
 		const normalizedTab = normalizeTabEntry(tab);
-		return normalizedTab.url === url;
+		const blockedHost = normalizeHostname(normalizedTab.url);
+		const blockedBase = baseDomain(blockedHost);
+		if (!blockedBase) {
+			return false;
+		}
+
+		return targetBase === blockedBase;
 	});
 }
 
@@ -202,15 +240,28 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 		return;
 	}
 
-	chrome.storage.local.get({ mode: 'work', playTabs: [], workTabs: [] }, (items) => {
+	chrome.storage.local.get({ mode: 'work', playTabs: [], workTabs: [], timerRunning: false }, (items) => {
+		if (!items.timerRunning) {
+			return;
+		}
+
 		const mode = items.mode === 'play' ? 'play' : 'work';
 		const blockedTabs = mode === 'work' ? items.playTabs : items.workTabs;
 		if (!isTabInList(targetUrl, blockedTabs)) {
 			return;
 		}
 
-		const tabTitle = tab?.title || 'Blocked tab';
-		const redirectUrl = `${blockedPageUrl}?title=${encodeURIComponent(tabTitle)}`;
+		let tabTitle = tab?.title || '';
+		if (!tabTitle) {
+			try {
+				const parsed = new URL(targetUrl);
+				tabTitle = parsed.hostname;
+			} catch {
+				tabTitle = 'Blocked tab';
+			}
+		}
+
+		const redirectUrl = `${blockedPageUrl}?title=${encodeURIComponent(tabTitle)}&url=${encodeURIComponent(targetUrl)}&mode=${mode}`;
 
 		chrome.tabs.update(tabId, { url: redirectUrl });
 	});

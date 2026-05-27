@@ -47,17 +47,17 @@ User clicks toolbar icon
         ▼
 background.js (service worker)
         │
-   Listens for tab navigation events
+   Persists state and listens for tab navigation events
         │
    If mode = "work" AND tab URL is in Play group
         │
         ▼
    Redirect tab → blocked.html
         │
-   Timer reaches zero → switch to Play mode → unblock tabs
+   Timer state is tracked in storage for the next phase
 ```
  
-The service worker (`background.js`) runs silently even when the popup is closed, which is what allows tab blocking to persist throughout your session.
+The service worker (`background.js`) runs silently even when the popup is closed, which is what allows tab blocking and shared state to persist throughout your session.
  
 ---
  
@@ -88,9 +88,9 @@ The service worker (`background.js`) runs silently even when the popup is closed
 ## Development roadmap
  
 - [x] Phase 1 — Project scaffold, manifest, and folder structure
-- [ ] Phase 2 — Popup UI (timer display, work/play toggle, tab group lists)
-- [ ] Phase 3 — Background service worker, `chrome.storage` integration, tab event listeners
-- [ ] Phase 4 — Tab blocking logic, `blocked.html` redirect page, countdown timer
+- [x] Phase 2 — Popup UI (timer display, work/play toggle, tab group lists)
+- [x] Phase 3 — Background service worker, `chrome.storage` integration, tab event listeners
+- [ ] Phase 4 — Tab blocking redirect page, background timer ownership, automatic mode switching
 - [ ] Phase 5 — Chrome notifications, icon design, Chrome Web Store packaging
 ---
  
@@ -110,7 +110,7 @@ This project is being built as a learning exercise, working through the Chrome E
 - **Phase 1** — what `manifest.json` is and how Chrome loads an extension
 - **Phase 2** — building a popup UI with HTML/CSS, Chrome popup constraints
 - **Phase 3** — service workers, async JavaScript, `chrome.storage`
-- **Phase 4** — event-driven programming, URL interception, `setInterval` timers
+- **Phase 4** — event-driven programming, URL interception, background timers
 - **Phase 5** — packaging, icons, and publishing
 ---
 

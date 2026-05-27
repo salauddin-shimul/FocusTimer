@@ -1,16 +1,19 @@
 document.addEventListener('DOMContentLoaded', () => {
 	const timerDisplay = document.querySelector('.timer-display');
+	const timerMinutesInput = document.querySelector('#timer-minutes');
+	const timerSetButton = document.querySelector('.timer-set-button');
 	const modeIndicator = document.querySelector('.mode-indicator');
 	const toggleButton = document.querySelector('.toggle-button');
 	const addTabButtons = document.querySelectorAll('.add-tab-button');
 	const workTabList = document.querySelector('.tab-group--work .tab-list');
 	const playTabList = document.querySelector('.tab-group--play .tab-list');
 
-	const defaultSeconds = 25 * 60;
-	let remainingSeconds = defaultSeconds;
+	const defaultDurationSeconds = 25 * 60;
+	const maxMinutes = 180;
+	let timerDurationSeconds = defaultDurationSeconds;
+	let timerSeconds = defaultDurationSeconds;
+	let timerRunning = false;
 	let currentMode = 'work';
-	let isRunning = false;
-	let intervalId = null;
 	let workTabs = [];
 	let playTabs = [];
 
@@ -40,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
 
 	function updateTimerDisplay() {
-		timerDisplay.textContent = formatTime(remainingSeconds);
+		timerDisplay.textContent = formatTime(timerSeconds);
 	}
 
 	function updateModeIndicator() {
@@ -52,12 +55,23 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
 
 	function updateToggleButton() {
-		if (isRunning) {
+		if (timerRunning) {
 			toggleButton.textContent = 'Pause';
 			return;
 		}
 
 		toggleButton.textContent = currentMode === 'work' ? 'Start Work' : 'Start Play';
+	}
+
+	function updateTimerEditor() {
+		const minutesValue = Math.max(1, Math.round(timerDurationSeconds / 60));
+
+		if (document.activeElement !== timerMinutesInput) {
+			timerMinutesInput.value = String(minutesValue);
+		}
+
+		timerMinutesInput.disabled = timerRunning;
+		timerSetButton.disabled = timerRunning;
 	}
 
 	function renderTabList(listElement, tabs, mode) {
@@ -81,83 +95,74 @@ document.addEventListener('DOMContentLoaded', () => {
 		renderTabList(playTabList, playTabs, 'play');
 	}
 
-	function saveState() {
-		if (!globalThis.chrome?.storage?.local) {
-			return;
-		}
-
-		chrome.storage.local.set({
-			mode: currentMode,
-			remainingSeconds,
-			isRunning,
-			workTabs,
-			playTabs,
-		});
-	}
-
 	function applyState(state) {
 		currentMode = state.mode === 'play' ? 'play' : 'work';
-		remainingSeconds = Number.isFinite(state.remainingSeconds) ? state.remainingSeconds : defaultSeconds;
-		isRunning = Boolean(state.isRunning);
+		timerDurationSeconds = Number.isFinite(state.timerDurationSeconds)
+			? state.timerDurationSeconds
+			: defaultDurationSeconds;
+		timerSeconds = Number.isFinite(state.timerSeconds) ? state.timerSeconds : timerDurationSeconds;
+		timerRunning = Boolean(state.timerRunning);
 		workTabs = Array.isArray(state.workTabs) ? state.workTabs.map(normalizeTabEntry) : [];
 		playTabs = Array.isArray(state.playTabs) ? state.playTabs.map(normalizeTabEntry) : [];
 
 		updateTimerDisplay();
 		updateModeIndicator();
 		updateToggleButton();
+		updateTimerEditor();
 		updateTabLists();
 	}
 
-	function stopTimer() {
-		if (intervalId !== null) {
-			clearInterval(intervalId);
-			intervalId = null;
-		}
-
-		isRunning = false;
-		updateToggleButton();
-		saveState();
-	}
-
-	function startTimer() {
-		if (intervalId !== null) {
+	function persistTabs() {
+		if (!globalThis.chrome?.storage?.local) {
 			return;
 		}
 
-		isRunning = true;
-		updateToggleButton();
-		saveState();
+		chrome.storage.local.set({
+			workTabs,
+			playTabs,
+		});
+	}
 
-		intervalId = setInterval(() => {
-			if (remainingSeconds <= 0) {
-				stopTimer();
-				return;
-			}
+	function handleTimerSet() {
+		if (timerRunning || !globalThis.chrome?.storage?.local) {
+			return;
+		}
 
-			remainingSeconds -= 1;
-			updateTimerDisplay();
+		const minutesValue = Number.parseInt(timerMinutesInput.value, 10);
+		if (!Number.isFinite(minutesValue)) {
+			updateTimerEditor();
+			return;
+		}
 
-			if (remainingSeconds <= 0) {
-				remainingSeconds = 0;
-				updateTimerDisplay();
-				stopTimer();
-			}
+		const clampedMinutes = Math.min(Math.max(minutesValue, 1), maxMinutes);
+		const nextDurationSeconds = clampedMinutes * 60;
 
-			saveState();
-		}, 1000);
+		timerDurationSeconds = nextDurationSeconds;
+		timerSeconds = nextDurationSeconds;
+		updateTimerDisplay();
+		updateTimerEditor();
+
+		chrome.storage.local.set({
+			timerDurationSeconds: nextDurationSeconds,
+			timerSeconds: nextDurationSeconds,
+		});
 	}
 
 	function handleToggleClick() {
-		currentMode = currentMode === 'work' ? 'play' : 'work';
-		updateModeIndicator();
-
-		if (isRunning) {
-			stopTimer();
-		} else {
-			startTimer();
+		if (!globalThis.chrome?.storage?.local) {
+			return;
 		}
 
-		saveState();
+		const nextRunning = !timerRunning;
+		const updates = {
+			timerRunning: nextRunning,
+		};
+
+		if (nextRunning && timerSeconds <= 0) {
+			updates.timerSeconds = timerDurationSeconds;
+		}
+
+		chrome.storage.local.set(updates);
 	}
 
 	function handleAddTab(event) {
@@ -172,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
 			}
 
 			updateTabLists();
-			saveState();
+			persistTabs();
 		};
 
 		if (hasChromeTabsApi()) {
@@ -196,6 +201,12 @@ document.addEventListener('DOMContentLoaded', () => {
 	}
 
 	toggleButton.addEventListener('click', handleToggleClick);
+	timerSetButton.addEventListener('click', handleTimerSet);
+	timerMinutesInput.addEventListener('keydown', (event) => {
+		if (event.key === 'Enter') {
+			handleTimerSet();
+		}
+	});
 
 	addTabButtons.forEach((button) => {
 		button.addEventListener('click', handleAddTab);
@@ -205,8 +216,9 @@ document.addEventListener('DOMContentLoaded', () => {
 		chrome.storage.local.get(
 			{
 				mode: 'work',
-				remainingSeconds: defaultSeconds,
-				isRunning: false,
+				timerDurationSeconds: defaultDurationSeconds,
+				timerSeconds: defaultDurationSeconds,
+				timerRunning: false,
 				workTabs: [],
 				playTabs: [],
 			},
@@ -220,8 +232,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 			const nextState = {
 				mode: currentMode,
-				remainingSeconds,
-				isRunning,
+				timerDurationSeconds,
+				timerSeconds,
+				timerRunning,
 				workTabs,
 				playTabs,
 			};
@@ -238,6 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		updateTimerDisplay();
 		updateModeIndicator();
 		updateToggleButton();
+		updateTimerEditor();
 		updateTabLists();
 	}
 });

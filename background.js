@@ -1,12 +1,16 @@
 const defaultState = {
 	mode: 'work',
-	remainingSeconds: 25 * 60,
-	isRunning: false,
+	timerDurationSeconds: 25 * 60,
+	timerSeconds: 25 * 60,
+	timerRunning: false,
 	workTabs: [],
 	playTabs: [],
 };
 
 const blockedPageUrl = chrome.runtime.getURL('blocked.html');
+const notificationIconUrl = 'icons/icon128.png';
+let timerIntervalId = null;
+let cachedTimerSeconds = null;
 
 function normalizeTabEntry(tab) {
 	if (typeof tab === 'string') {
@@ -22,11 +26,22 @@ function normalizeTabEntry(tab) {
 	};
 }
 
-function getDefaultState() {
+function normalizeState(items) {
+	const timerDurationSeconds = Number.isFinite(items.timerDurationSeconds)
+		? items.timerDurationSeconds
+		: defaultState.timerDurationSeconds;
+	const timerSeconds = Number.isFinite(items.timerSeconds)
+		? items.timerSeconds
+		: timerDurationSeconds;
+
 	return {
 		...defaultState,
-		workTabs: [...defaultState.workTabs],
-		playTabs: [...defaultState.playTabs],
+		...items,
+		mode: items.mode === 'play' ? 'play' : 'work',
+		timerDurationSeconds,
+		timerSeconds,
+		workTabs: Array.isArray(items.workTabs) ? items.workTabs : [],
+		playTabs: Array.isArray(items.playTabs) ? items.playTabs : [],
 	};
 }
 
@@ -37,22 +52,90 @@ function isPlayTab(url, playTabs) {
 	});
 }
 
-chrome.runtime.onInstalled.addListener(() => {
+function stopTimerInterval() {
+	if (timerIntervalId !== null) {
+		clearInterval(timerIntervalId);
+		timerIntervalId = null;
+	}
+}
+
+function notifyModeChange(nextMode) {
+	const message = nextMode === 'play'
+		? 'Work session complete. Enjoy your play break.'
+		: 'Play session complete. Back to work.';
+
+	chrome.notifications.create({
+		type: 'basic',
+		iconUrl: notificationIconUrl,
+		title: 'Focus Timer',
+		message,
+	});
+}
+
+function handleTimerComplete() {
+	stopTimerInterval();
+
 	chrome.storage.local.get(defaultState, (items) => {
+		const state = normalizeState(items);
+		const nextMode = state.mode === 'work' ? 'play' : 'work';
+		const nextTimerSeconds = state.timerDurationSeconds;
+
 		chrome.storage.local.set({
-			...getDefaultState(),
-			...items,
+			mode: nextMode,
+			timerSeconds: nextTimerSeconds,
+			timerRunning: false,
+		});
+
+		notifyModeChange(nextMode);
+	});
+}
+
+function startTimerInterval() {
+	if (timerIntervalId !== null) {
+		return;
+	}
+
+	chrome.storage.local.get(defaultState, (items) => {
+		const state = normalizeState(items);
+		cachedTimerSeconds = state.timerSeconds > 0 ? state.timerSeconds : state.timerDurationSeconds;
+
+		chrome.storage.local.set({
+			timerSeconds: cachedTimerSeconds,
+		});
+
+		timerIntervalId = setInterval(() => {
+			cachedTimerSeconds = Math.max(0, (cachedTimerSeconds ?? 0) - 1);
+
+			if (cachedTimerSeconds <= 0) {
+				handleTimerComplete();
+				return;
+			}
+
+			chrome.storage.local.set({
+				timerSeconds: cachedTimerSeconds,
+			});
+		}, 1000);
+	});
+}
+
+function initializeState() {
+	chrome.storage.local.get(defaultState, (items) => {
+		const state = normalizeState(items);
+
+		chrome.storage.local.set(state, () => {
+			if (state.timerRunning) {
+				startTimerInterval();
+			}
 		});
 	});
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+	initializeState();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-	chrome.storage.local.get(defaultState, (items) => {
-		chrome.storage.local.set({
-			...getDefaultState(),
-			...items,
-		});
-	});
+	initializeState();
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -62,10 +145,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 	if (message.type === 'focusTimer:getState') {
 		chrome.storage.local.get(defaultState, (items) => {
-			sendResponse({
-				...getDefaultState(),
-				...items,
-			});
+			sendResponse(normalizeState(items));
 		});
 
 		return true;
@@ -82,48 +162,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 	return false;
 });
 
-chrome.tabs.onCreated.addListener((tab) => {
-	if (tab && tab.id !== undefined) {
-		console.log('Focus Timer observed new tab:', tab.id);
-	}
-});
-
-chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
-	if (changeInfo && changeInfo.status === 'complete') {
-		console.log('Focus Timer tab updated:', tabId);
-	}
-});
-
-chrome.tabs.onRemoved.addListener((tabId) => {
-	console.log('Focus Timer tab removed:', tabId);
-});
-
-chrome.webNavigation.onCommitted.addListener((details) => {
-	if (details.frameId !== 0) {
+chrome.storage.onChanged.addListener((changes, areaName) => {
+	if (areaName !== 'local') {
 		return;
 	}
 
-	if (!details.url || details.url.startsWith('chrome-extension://')) {
+	if (changes.timerRunning) {
+		if (changes.timerRunning.newValue) {
+			startTimerInterval();
+		} else {
+			stopTimerInterval();
+		}
+	}
+
+	if (changes.timerSeconds && timerIntervalId === null) {
+		cachedTimerSeconds = changes.timerSeconds.newValue;
+	}
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+	if (!changeInfo || changeInfo.status !== 'loading') {
 		return;
 	}
 
-	chrome.storage.local.get(defaultState, (items) => {
-		const state = {
-			...getDefaultState(),
-			...items,
-			playTabs: Array.isArray(items.playTabs) ? items.playTabs : [],
-		};
+	const targetUrl = changeInfo.url || tab?.url;
+	if (!targetUrl || targetUrl.startsWith('chrome-extension://')) {
+		return;
+	}
 
-		if (state.mode !== 'work') {
+	chrome.storage.local.get({ mode: 'work', playTabs: [] }, (items) => {
+		if (items.mode !== 'work') {
 			return;
 		}
 
-		if (!isPlayTab(details.url, state.playTabs)) {
+		if (!isPlayTab(targetUrl, items.playTabs)) {
 			return;
 		}
 
-		const redirectUrl = `${blockedPageUrl}?url=${encodeURIComponent(details.url)}`;
+		const tabTitle = tab?.title || 'Blocked tab';
+		const redirectUrl = `${blockedPageUrl}?title=${encodeURIComponent(tabTitle)}`;
 
-		chrome.tabs.update(details.tabId, { url: redirectUrl });
+		chrome.tabs.update(tabId, { url: redirectUrl });
 	});
 });

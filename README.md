@@ -47,17 +47,17 @@ User clicks toolbar icon
         ▼
 background.js (service worker)
         │
-   Persists state and listens for tab navigation events
+   Persists state, runs the countdown, and listens for tab navigation events
         │
    If mode = "work" AND tab URL is in Play group
         │
         ▼
    Redirect tab → blocked.html
         │
-   Timer state is tracked in storage for the next phase
+   Timer reaches zero → switch to Play mode → unblock tabs
 ```
  
-The service worker (`background.js`) runs silently even when the popup is closed, which is what allows tab blocking and shared state to persist throughout your session.
+The service worker (`background.js`) runs silently even when the popup is closed, which is what allows tab blocking, timer countdowns, and shared state to persist throughout your session.
  
 ---
  
@@ -90,7 +90,7 @@ The service worker (`background.js`) runs silently even when the popup is closed
 - [x] Phase 1 — Project scaffold, manifest, and folder structure
 - [x] Phase 2 — Popup UI (timer display, work/play toggle, tab group lists)
 - [x] Phase 3 — Background service worker, `chrome.storage` integration, tab event listeners
-- [ ] Phase 4 — Tab blocking redirect page, background timer ownership, automatic mode switching
+- [x] Phase 4 — Tab blocking redirect page, background timer ownership, automatic mode switching
 - [ ] Phase 5 — Chrome notifications, icon design, Chrome Web Store packaging
 ---
  

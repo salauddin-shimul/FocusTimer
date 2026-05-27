@@ -1,6 +1,7 @@
 const defaultState = {
 	mode: 'work',
-	timerDurationSeconds: 25 * 60,
+	workDurationSeconds: 25 * 60,
+	playDurationSeconds: 5 * 60,
 	timerSeconds: 25 * 60,
 	timerRunning: false,
 	workTabs: [],
@@ -27,18 +28,24 @@ function normalizeTabEntry(tab) {
 }
 
 function normalizeState(items) {
-	const timerDurationSeconds = Number.isFinite(items.timerDurationSeconds)
-		? items.timerDurationSeconds
-		: defaultState.timerDurationSeconds;
+	const mode = items.mode === 'play' ? 'play' : 'work';
+	const workDurationSeconds = Number.isFinite(items.workDurationSeconds)
+		? items.workDurationSeconds
+		: defaultState.workDurationSeconds;
+	const playDurationSeconds = Number.isFinite(items.playDurationSeconds)
+		? items.playDurationSeconds
+		: defaultState.playDurationSeconds;
+	const fallbackSeconds = mode === 'work' ? workDurationSeconds : playDurationSeconds;
 	const timerSeconds = Number.isFinite(items.timerSeconds)
 		? items.timerSeconds
-		: timerDurationSeconds;
+		: fallbackSeconds;
 
 	return {
 		...defaultState,
 		...items,
-		mode: items.mode === 'play' ? 'play' : 'work',
-		timerDurationSeconds,
+		mode,
+		workDurationSeconds,
+		playDurationSeconds,
 		timerSeconds,
 		workTabs: Array.isArray(items.workTabs) ? items.workTabs : [],
 		playTabs: Array.isArray(items.playTabs) ? items.playTabs : [],
@@ -78,7 +85,9 @@ function handleTimerComplete() {
 	chrome.storage.local.get(defaultState, (items) => {
 		const state = normalizeState(items);
 		const nextMode = state.mode === 'work' ? 'play' : 'work';
-		const nextTimerSeconds = state.timerDurationSeconds;
+		const nextTimerSeconds = nextMode === 'work'
+			? state.workDurationSeconds
+			: state.playDurationSeconds;
 
 		chrome.storage.local.set({
 			mode: nextMode,
@@ -97,7 +106,10 @@ function startTimerInterval() {
 
 	chrome.storage.local.get(defaultState, (items) => {
 		const state = normalizeState(items);
-		cachedTimerSeconds = state.timerSeconds > 0 ? state.timerSeconds : state.timerDurationSeconds;
+		const fallbackSeconds = state.mode === 'work'
+			? state.workDurationSeconds
+			: state.playDurationSeconds;
+		cachedTimerSeconds = state.timerSeconds > 0 ? state.timerSeconds : fallbackSeconds;
 
 		chrome.storage.local.set({
 			timerSeconds: cachedTimerSeconds,

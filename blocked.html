@@ -6,15 +6,15 @@
     <title>You're in Work Mode</title>
     <style>
       :root {
-        --color-bg: #fbfcff;
-        --color-bg-alt: #f1f5fb;
-        --color-surface: #ffffff;
-        --color-text: #111827;
-        --color-muted: #6b7280;
-        --color-border: #e5e7eb;
+        --color-bg: #0b1020;
+        --color-bg-alt: #111827;
+        --color-surface: #0f172a;
+        --color-text: #e5e7eb;
+        --color-muted: #94a3b8;
+        --color-border: #1f2937;
         --color-work: #16a34a;
-        --color-ink: #0f172a;
-        --shadow-soft: 0 18px 48px rgba(17, 24, 39, 0.12);
+        --color-ink: #f8fafc;
+        --shadow-soft: 0 18px 48px rgba(15, 23, 42, 0.45);
       }
 
       html,
@@ -49,8 +49,8 @@
         min-height: 28px;
         padding: 0 12px;
         border-radius: 999px;
-        background: rgba(22, 163, 74, 0.15);
-        color: #166534;
+        background: rgba(22, 163, 74, 0.2);
+        color: #bbf7d0;
         font-size: 12px;
         font-weight: 700;
         letter-spacing: 0.02em;
@@ -83,7 +83,7 @@
         margin-top: 18px;
         padding: 12px 14px;
         border-radius: 14px;
-        background: var(--color-bg-alt);
+        background: rgba(15, 23, 42, 0.6);
         color: var(--color-ink);
         font-size: 13px;
         font-weight: 700;
@@ -109,8 +109,8 @@
         border-radius: 12px;
         min-height: 44px;
         padding: 0 16px;
-        background: var(--color-ink);
-        color: #ffffff;
+        background: #1f2937;
+        color: #f8fafc;
         font: inherit;
         font-weight: 700;
         cursor: pointer;
@@ -125,10 +125,10 @@
   </head>
   <body>
     <main>
-      <div class="badge">Blocked during Work Mode</div>
+      <div class="badge" id="mode-badge">Blocked during Work Mode</div>
       <p class="eyebrow">Focus Timer</p>
-      <h1>You're in Work Mode.</h1>
-      <p>
+      <h1 id="mode-heading">You're in Work Mode.</h1>
+      <p id="mode-message">
         This tab is in your Play group, so it stays paused while your work session is active.
       </p>
       <div class="tab-title" id="blocked-title">Loading tab title...</div>
@@ -151,6 +151,9 @@
         timerRunning: false,
       };
       let currentState = { ...defaultState };
+      const modeBadge = document.getElementById('mode-badge');
+      const modeHeading = document.getElementById('mode-heading');
+      const modeMessage = document.getElementById('mode-message');
 
       function formatTime(totalSeconds) {
         const minutes = Math.floor(totalSeconds / 60);
@@ -160,17 +163,21 @@
       }
 
       function updateStatus(state) {
+        modeBadge.textContent = 'Blocked during Work Mode';
+        modeHeading.textContent = 'You\'re in Work Mode.';
+        modeMessage.textContent = 'This tab is in your Play group, so it stays paused while your work session is active.';
+
         if (state.mode !== 'work') {
-          blockedStatusElement.textContent = 'Play mode is active. You can return to this tab.';
+          blockedStatusElement.textContent = 'Play Mode is active. You can return to this tab.';
           return;
         }
 
         if (!state.timerRunning) {
-          blockedStatusElement.textContent = 'Timer is paused. Start it from the popup to resume.';
+          blockedStatusElement.textContent = 'Timer is paused. Start Work from the popup to resume.';
           return;
         }
 
-        blockedStatusElement.textContent = `Play mode starts in ${formatTime(state.timerSeconds)}.`;
+        blockedStatusElement.textContent = `Play Mode starts in ${formatTime(state.timerSeconds)}.`;
       }
 
       if (blockedTitle) {
@@ -199,7 +206,7 @@
           updateStatus(currentState);
         });
       } else {
-        blockedStatusElement.textContent = 'Play mode will begin when the timer ends.';
+        blockedStatusElement.textContent = 'Play Mode will begin when the timer ends.';
       }
 
       goBackButton.addEventListener('click', () => {

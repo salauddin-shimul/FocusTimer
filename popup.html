@@ -2,26 +2,42 @@
 <html>
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Focus Timer</title>
-    <style>
-      body {
-        width: 280px;
-        padding: 20px;
-        font-family: sans-serif;
-        text-align: center;
-      }
-      h1 {
-        font-size: 18px;
-        margin: 0 0 8px;
-      }
-      p {
-        color: #666;
-        font-size: 14px;
-      }
-    </style>
+    <link rel="stylesheet" href="popup.css" />
+    <script src="popup.js" defer></script>
   </head>
   <body>
-    <h1>Focus Timer</h1>
-    <p>Extension loaded successfully!</p>
+    <main class="popup" aria-label="Focus Timer">
+      <header class="popup__header">
+        <p class="popup__eyebrow">Focus Timer</p>
+        <h1 class="popup__title">Stay on task, then take a break.</h1>
+      </header>
+
+      <section class="timer-panel" aria-labelledby="timer-heading">
+        <h2 id="timer-heading" class="sr-only">Timer</h2>
+        <div class="timer-display" aria-live="polite" aria-atomic="true">25:00</div>
+        <div class="mode-indicator mode-indicator--work" aria-live="polite">Work Mode</div>
+        <button type="button" class="toggle-button">Start Work</button>
+      </section>
+
+      <section class="tabs-panel" aria-label="Tab lists">
+        <article class="tab-group tab-group--work" aria-labelledby="work-tabs-heading">
+          <header class="tab-group__header">
+            <h2 id="work-tabs-heading">Work Tabs</h2>
+          </header>
+          <ul class="tab-list" aria-label="Work tabs"></ul>
+          <button type="button" class="add-tab-button" data-mode="work">Add current tab</button>
+        </article>
+
+        <article class="tab-group tab-group--play" aria-labelledby="play-tabs-heading">
+          <header class="tab-group__header">
+            <h2 id="play-tabs-heading">Play Tabs</h2>
+          </header>
+          <ul class="tab-list" aria-label="Play tabs"></ul>
+          <button type="button" class="add-tab-button" data-mode="play">Add current tab</button>
+        </article>
+      </section>
+    </main>
   </body>
 </html>

@@ -65,12 +65,12 @@ The service worker (`background.js`) runs silently even when the popup is closed
  
 1. Clone this repository:
    ```bash
-   git clone https://github.com/your-username/focus-timer.git
+   git clone https://github.com/salauddin-shimul/FocusTimer.git
    ```
  
 2. Open Chrome and navigate to `chrome://extensions`
 3. Enable **Developer mode** using the toggle in the top-right corner
-4. Click **Load unpacked** and select the `focus-timer` folder
+4. Click **Load unpacked** and select the `FocusTimer` folder
 5. The extension will appear in your toolbar — click the puzzle-piece icon and pin it
 ---
  
@@ -113,7 +113,9 @@ This project is being built as a learning exercise, working through the Chrome E
 - **Phase 4** — event-driven programming, URL interception, `setInterval` timers
 - **Phase 5** — packaging, icons, and publishing
 ---
- 
+
+AI was used to help with this project.
+
 ## License
  
 MIT

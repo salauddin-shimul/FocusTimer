@@ -1,0 +1,20 @@
+{
+    "manifest_version": 3,
+    "name": "Focus Timer",
+    "version": "1.0",
+    "description": "Block distracting sites and tabs during work sessions.",
+    "permissions": ["tabs", "storage", "webNavigation", "notifications"],
+    "background": {
+        "service_worker": "background.js"
+    },
+
+    "action": {
+        "default_popup": "popup.html",
+        "default_timer": "Focus Timer"
+        
+    },
+    
+    "icons": {
+        "128": "icons/icon128.png"
+  }
+}
